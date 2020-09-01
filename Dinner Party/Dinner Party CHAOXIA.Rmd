@@ -1,0 +1,153 @@
+---
+title: "Appendix"
+author: "Group7"
+date: "09/10/2019"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+---
+## Dinner Party
+Suppose you are at a dinner party. The host wants to give out a door prize that is wrapped in a box. Everyone (including the host) sits around a circular table and each person is given a fair coin. Initially the host is holding the box. He/she flips his coin. If it is heads, the box is passed to the right; if it is tails, it is passed to the left. The process is repeated by whichever guest is holding the box. (Heads, they pass right; tails, they pass left.) The game ends when the last person to receive the box finally gets it for the first time. That person gets to keep the box as the winner of the game.
+
+## Solution
+```{r}
+set.seed(2018)
+n <- 10 # number of people
+winner <- numeric()
+repeattimes <- 10000
+for (i in 1:repeattimes){
+  table <- rep(0,n)
+  gift <- rep(0,n)
+  table[1] = 1
+  gift[1] = 1
+  while (length(which(table == 0)) > 1){
+    flag <- which(gift == 1) # who has the gift box?
+    coin <- sample(c(0,1),1) # 0 is left, 1 is right
+    if (coin == 0){
+      if (flag == 1){
+        gift[n] = 1
+        gift[1] = 0
+        table[n] = table[n] + 1
+      }
+      else {
+        gift[flag - 1] = 1
+        gift[flag] = 0
+        table[flag - 1] = table[flag - 1] + 1
+      }
+    }
+    else {
+      if (flag == n){
+        gift[1] = 1
+        gift[n] = 0
+        table[1] = table[1] + 1
+      }
+      else {
+        gift[flag + 1] = 1
+        gift[flag] = 0
+        table[flag + 1] = table[flag + 1] + 1
+      }
+    }
+  }
+  winner[i] <- which(table == 0)
+}
+
+as.data.frame(table(winner))
+```
+
+OH!
+
+Although it's unbelievable, there is no optimal method to achieve the gift. The distribution of the winner is the same.
+
+# The Next Card Game Simulation 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+For the next card game simulation, we'll try to use simulation to find the best strategy.
+
+First of all, we make a stop_play function to decide when to stop the game and the probablity of winning.
+
+```{r Main Function}
+stop_play <- function(){
+  # in each deck: 26 red ("0") 26 black ("1")
+  deck_data <- rep(c(0, 1), 26)
+  # shuffle one deck  
+  deck_samp <- sample(deck_data, replace = FALSE)
+  # win or lose depends on the next card 
+  # if I cannot stop before the first card drew
+  win_lose <- deck_samp
+  # if I cannot stop before the first card drew
+  #win_lose <- as.numeric(c(deck_samp[2:52]==1))
+  # stop at each point: win or lose, expect prob
+  red_num <- sapply(1:52,function(x){
+    sum(deck_samp[1:x]==0)})
+  black_num<-sapply(1:52,function(x){
+    sum(deck_samp[1:x]==1)})
+  prob_win <- round(sapply(1:52,function(x){
+    sum(deck_samp[x:52]==1)/(52-x)}), 2)
+#    sum(deck_samp[(x+1):52]==1)/(52-x)}), 2)
+  differ <- black_num-red_num
+  # useful result
+  result <- data.frame(differ, 
+                       win_lose, #=c(win_lose, NA), 
+                       prob_win
+                       )#[-52,]
+  #win_result <- result[which(result[,2] == 1),]
+  return(result)
+}
+```
+
+For one game, we write game_play function to find the probability of winning and the result of winning or losing for each time we want to stop from the very first card to the last card.
+
+```{r Repeatation}
+# play again and again
+game_play <- function(t){
+  # replicate t times
+  a <- Reduce(rbind, lapply(1:t, function(x){
+    stop_play()
+    }))
+  # results in table
+  # by difference of cards
+  diff_tab <- as.data.frame(table(a[c('differ', 'win_lose')]))%>% 
+              spread(key=win_lose, value=Freq) %>% 
+              `colnames<-`(c('Diff', 'Win', 'Lose'))
+  diff_tab$Rate <- diff_tab$Win/(diff_tab$Win+diff_tab$Lose)
+  # by expective win probability
+  prob_tab <- as.data.frame(table(a[c('prob_win', 'win_lose')]))%>% 
+              spread(key=win_lose, value=Freq)%>%
+              `colnames<-`(c('Prob', 'Win', 'Lose')
+                                                          )
+  prob_tab$Rate <- prob_tab$Win/(prob_tab$Win+prob_tab$Lose)
+  return(list(diff_tab, prob_tab))
+}
+```
+
+We will try to repeat the game 10000 times.
+
+```{r Test, eval=FALSE, include=FALSE}
+# record running time of playing game
+#RunTests<-function(){
+  # begin to play
+  #start_time <- Sys.time()
+  #play <- game_play(10000)
+  #end_time <- Sys.time()
+  #cat("\n t=",end_time - start_time)
+#}
+#RunTests()
+```
+
+```{r Result}
+# play game for 1000 times
+play <- game_play(10000)
+
+# result in plots
+ggplot(data = as.data.frame(play[1]), aes(Diff, Win)) +
+  geom_bar(stat = "identity", width=0.9, position="stack") +
+  ggtitle("Win Events of Different Difference")
+
+ggplot(data = as.data.frame(play[2]), aes(Prob, Win)) +
+  geom_bar(stat = "identity", width=0.9, position="stack") +
+  ggtitle("Win Events of Different Probability")
+```

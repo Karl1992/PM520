@@ -1,0 +1,296 @@
+---
+title: "Assignment 4"
+author: "Chao XIA"
+date: "04/11/2019"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Part 1
+
+## Description
+
+1. Use the Urn model starting with 2 red balls of weight 1, and one black (mutation) ball of weight w;
+
+2. Draw balls until you have 10 non-black balls;
+
+3. If all non-black balls are the same color at the end, what is the posterior distribution of the weight of the black ball?
+
+4. Use a Uniform[0,20] prior for the weight of the black ball
+
+## The Urn function
+
+```{r}
+Urn_G <- function(finalballamount, starting_ball, black_weight){
+  
+  ball <- starting_ball # define the starting cituation
+  
+  while(length(ball) < finalballamount){
+    
+    pick <- sample(ball, 1, prob  = c(rep(1, length(ball)-1), black_weight)) # pick one ball from the urn
+    
+    if (pick == "0"){ # 0 is black
+      
+      ball <- ball[-which(ball == pick)] # pick the black ball
+      
+      pick2 <- sample(1:length(ball), 1) # pick a ball from the remaining balls
+      
+      ball[pick2] <- as.character(length(ball) + 1) # change the ball's color (since each iteration the length of ball will increase or remain the same, we'll never repeat the ball's color)
+      
+      ball <- c(ball, pick) # put back the black ball
+      
+    }else{
+      ball <- ball[-length(ball)]
+      
+      ball <- c(ball, pick, "0") # else just add a ball with the picked color and keep the black ball at last of the row
+      
+    }
+  }
+  
+  return(ball)
+}
+```
+
+## Some Necessary Parameter
+
+```{r}
+NoReps <- 10000 # number of iterations
+ 
+Howmanycolorneeded <- 1 # number of color needed
+
+Maxweight <- 20 # Max weight of blackball
+
+Noofballs <- 11 # Number of balls need including blackball
+```
+
+## Code and result
+
+```{r}
+Acceptedweights <- rep(-9, NoReps)
+
+Starttime <- Sys.time()
+
+for (i in 1:NoReps) {
+  HowManyColorsObserved<- -9
+  while (HowManyColorsObserved != Howmanycolorneeded) {
+    # Sample a weight, ThisWeight, for the mutation ball, from Unif(0,MaxWeight). Then...
+    ThisWeight <- sample(Maxweight,1)
+    Final_state <- Urn_G(Noofballs, c(1,1,0), ThisWeight) # simulate the urn using this weight
+    HowManyColorsObserved <- length(table(Final_state)) - 1
+  }
+  Acceptedweights[i]<-ThisWeight
+}
+
+Finishtime <- Sys.time()
+
+hist(Acceptedweights, breaks = Maxweight, main = paste("Histogram of Accepted Weights", "\n", "Time =", round((Finishtime - Starttime),2), "minutes"))
+```
+
+# Part 2
+
+## Description
+
+1. Repeat the Urn model assignment to find the posterior distribution of the weight of the black ball given that we observe just one color in an urn containing 5 balls;
+
+2. This time, sample $\theta'$ from $\xi$ ~ exponential($\lambda$), rather than a Uniform distribution;
+
+3. If you accept that value of $\theta'$ (because the simulated urn has just one color in it), then add a mass of $\frac{\pi(\theta')}{\xi(\theta')}$  to the posterior distribution (of 􀀉􀀁􀀁􀀂whereas we used to add a mass of 1);
+
+4. If we truncate the exponential at 20 (say), this means:
+
+   $\pi(\theta') = \frac{1}{20}$
+   
+   $\xi(\theta') = \frac{\lambda e^{-\lambda \theta'}}{1-e^{-20 \lambda}}$
+   
+5. Compare efficiency to a rejection method that just samples directly from a Uniform[0,20] distribution. (i.e. how many simulations do you need to generate 10000 acceptances; and how smooth does the histogram look?)
+
+## Code and Result
+
+```{r}
+library(plotrix)
+Acceptedweights <- rep(-9, NoReps)
+mass <- rep(-9, NoReps)
+
+lambda <- 2
+
+Starttime <- Sys.time()
+
+for (i in 1:NoReps) {
+  HowManyColorsObserved<- -9
+  while (HowManyColorsObserved != Howmanycolorneeded) {
+    theta <- rexp(1, rate = lambda)
+    while (theta > 20){
+    theta <- rexp(1, rate = lambda)
+    }
+    Final_state <- Urn_G(Noofballs, c(1,1,0), theta) # simulate the urn using this weight
+    HowManyColorsObserved <- length(table(Final_state)) - 1
+  }
+  Acceptedweights[i] <- theta
+  mass[i] <- (1/Maxweight/(lambda*exp(-lambda*theta)/(1-exp(-Maxweight*lambda))))
+}
+
+Finishtime <- Sys.time()
+
+weighted.hist(Acceptedweights, mass, main = paste("Histogram of Accepted Weights via Importance sampling", "\n", "Time =", round((Finishtime - Starttime),2), "Seconds"), breaks = 100)
+```
+
+The importance sampling using obviously less time than sampling from uniform distribition but the histogram is worse in importance sampling. Importance sampling has more noise. 
+
+## Lambda
+
+Using different Lambad to see the influence of $\lambda$
+
+```{r}
+lambda_can <- c(0.5, 1, 2, 4, 8)
+
+par(mfrow = c(2,3))
+
+for (i in lambda_can) {
+  
+  Acceptedweights <- rep(-9, NoReps)
+  mass <- rep(-9, NoReps)
+  
+  for (j in 1:NoReps) {
+    HowManyColorsObserved<- -9
+    while (HowManyColorsObserved != Howmanycolorneeded) {
+      theta <- rexp(1, rate = lambda)
+      while (theta > 20){
+      theta <- rexp(1, rate = lambda)
+      }
+      Final_state <- Urn_G(Noofballs, c(1,1,0), theta)
+      HowManyColorsObserved <- length(table(Final_state)) - 1
+    }
+    Acceptedweights[j] <- theta
+    mass[j] <- (1/Maxweight/(lambda*exp(-lambda*theta)/(1-exp(-Maxweight*lambda))))
+  }
+  
+  weighted.hist(Acceptedweights, mass, main = paste("lambda =", i), breaks = 100)
+}
+```
+
+The influence of $\lambda$ is a little different with larger weight. Some large weights have high importance.
+
+
+# Part 3
+
+## Description
+
+1. Many tissues contain 2 (or more) cell-types;
+
+2. Investigator wants a way of testing whether each of 2 cell types in a given tissue is homogeneously distributed (in space);
+
+3. Your job, is to come up with such a test, using Monte Carlo methods.
+
+## Threshold
+
+In my opinion, if a grid is homogeneouly distributed, then the coordinate of the tissues with 1 should be randomly distributed, we can use the distribution of spot with 1 to judge if the grid is randomly distributed. I'm using variance of x and y to judge the distribution.
+
+## Some functions and reading the data
+
+```{r}
+Grid1 <- read.table("D:/study/MasterinUSC/pm520/week10/grid1.txt", header = F)
+
+Grid2 <- read.table("D:/study/MasterinUSC/pm520/week10/grid2.txt", header = F)
+
+Grid3 <- read.table("D:/study/MasterinUSC/pm520/week10/grid3.txt", header = F)
+
+# generate new grid
+
+Permutate_grid <- function(x){
+  nrow_grid <- nrow(x)
+  ncol_grid <- ncol(x)
+  x <- as.matrix(x)
+  x <- as.vector(x)
+  new_grid <- sample(x)
+  new_grid <- matrix(data = new_grid, nrow = 25, ncol = 25)
+  new_grid <- as.data.frame(new_grid)
+  return(new_grid)
+}
+
+# judgement
+
+Coordinate <- function(x){
+  nrow_grid <- nrow(x)
+  ncol_grid <- ncol(x)
+  Distance <- numeric()
+  for(i in 1:nrow_grid){
+    for(j in 1:ncol_grid){
+      if(x[i,j] == 1){
+        Distance <- rbind(Distance, c(i,j))
+      } 
+    }
+  }
+  x_var <- var(Distance[,1])
+  y_var <- var(Distance[,2])
+  mod <- sqrt(x_var + y_var) 
+  return(c(sqrt(x_var), sqrt(y_var), mod))
+}
+
+# Calculate p-value via mod of variance of coordinate
+
+prob <- function(x,y){
+  p <- length(which(y < x)) / length(y)
+  if(p > 0.5){
+    return(1 - p)
+  }else{
+    return(p)
+  }
+}
+```
+
+## Two dimensional plot
+
+```{r}
+point1 <- replicate(10000,Coordinate(Permutate_grid(Grid1)))
+Grid1_var <- Coordinate(Grid1)
+
+point2 <- replicate(10000,Coordinate(Permutate_grid(Grid2)))
+Grid2_var <- Coordinate(Grid2)
+
+point3 <- replicate(10000,Coordinate(Permutate_grid(Grid3)))
+Grid3_var <- Coordinate(Grid3)
+
+par(mfrow = c(1,3))
+
+plot(x = point1[1,], y = point1[2,], main = "Two dimentional plot of grid 1", xlab = "x var", ylab = "y var")
+segments(x0 = Grid1_var[1], y0 = Grid1_var[2], x1 = Grid1_var[1], y1 = 100, col = "red", lwd = 3)
+segments(x0 = Grid1_var[1], y0 = Grid1_var[2], y1 = Grid1_var[2], x1 = 100, col = "red", lwd = 3)
+
+plot(x = point2[1,], y = point2[2,], main = "Two dimentional plot of grid 2", xlab = "x var", ylab = "y var")
+segments(x0 = Grid2_var[1], y0 = Grid2_var[2], x1 = Grid2_var[1], y1 = 100, col = "red", lwd = 3)
+segments(x0 = Grid2_var[1], y0 = Grid2_var[2], y1 = Grid2_var[2], x1 = 100, col = "red", lwd = 3)
+
+plot(x = point3[1,], y = point1[2,], main = "Two dimentional plot of grid 3", xlab = "x var", ylab = "y var")
+segments(x0 = Grid3_var[1], y0 = Grid3_var[2], x1 = Grid3_var[1], y1 = 100, col = "red", lwd = 3)
+segments(x0 = Grid3_var[1], y0 = Grid3_var[2], y1 = Grid3_var[2], x1 = 100, col = "red", lwd = 3)
+```
+
+## Histogram and p-value
+In order to calculate p-value, we can use mode of point the evaluate the distribution.
+```{r}
+p1 <- prob(Grid1_var[3], point1[3,])
+hist(point1[3,], main = paste("Histogram of Grid1", "\n", "p =", p1), xlab = "mode")
+abline(v = Grid1_var[3], lwd = 3, col = "red")
+
+
+
+p2 <- prob(Grid2_var[3], point2[3,])
+hist(point2[3,], main = paste("Histogram of Grid2", "\n", "p =", p2), xlim = c(Grid2_var[3],11), xlab = "mode")
+abline(v = Grid2_var[3], lwd = 3, col = "red")
+
+
+p3 <- prob(Grid3_var[3], point3[3,])
+hist(point3[3,], main = paste("Histogram of Grid3", "\n", "p =", p3), xlab = "mode")
+abline(v = Grid3_var[3], lwd = 3, col = "red")
+```
+
+## Discussion
+
+If we set $\alpha$ = 0.05, then grid1 is statistically signifcantly homogenuously distributed;
+
+If we set $\alpha$ = 0.05, then grid1 is not statistically signifcantly homogenuously distributed (p = 0.09).
+
+Grid2 is absolutely not statistically signifcantly homogenuously distributed (p < 0.00001).
+
+Grid3 is tatistically signifcantly homogenuously distributed (p = 0.4).

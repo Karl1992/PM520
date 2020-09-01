@@ -1,0 +1,74 @@
+---
+title: "The Polya Urn version 2"
+author: "Chao XIA"
+date: "02/10/2019"
+output: pdf_document
+---
+
+## The Polya Urn version 2
+a. Add a black (special color) ball. Start with two balls, one of which is black.
+b. If you draw a non-black ball, proceed as before (add an additional ball of the same color)。
+c. If you draw a black ball do the following:
+    1. Keep the black ball for now.
+    2. Draw another ball from the urn.
+    3. Change the color of the second ball, making it a color that is not currently in the urn.
+    4. Put both balls back in the urn.
+
+## My code
+```{r}
+set.seed(1992)
+
+n <- 50 # the final ball amount without black ball
+
+Urn_v2 <- function(finalball, starting_ball){
+  
+  ball <- starting_ball # define the starting cituation
+  
+  while(length(ball) < finalball){
+    
+    pick <- sample(ball, 1) # pick one ball from the urn
+    
+    if (pick == "0"){ # 0 is black
+      
+      ball <- ball[-which(ball == pick)] # pick the black ball
+      
+      pick2 <- sample(1:length(ball), 1) # pick a ball from the remaining balls
+      
+      ball[pick2] <- as.character(length(ball) + 1) # change the ball's color (since each iteration the length of ball will increase or remain the same, we'll never repeat the ball's color)
+      
+      ball <- c(ball, pick) # put back the black ball
+      
+    }else{
+      
+      ball <- c(ball, pick) # else just add a ball with the picked color
+      
+    }
+    
+  }
+  
+  return(ball)
+  
+}
+
+end <- numeric() # store the number of (non-black) colors at the end
+common <- numeric() # store the number of balls of the commonest color at the end
+repeattimes <- 10000
+for (i in 1:repeattimes) {
+  result <- Urn_v2(n+1, c("1","0"))
+  end[i] <- length(table(result)) - 1
+  common[i] <- max(table(result))
+}
+
+hist(end)
+hist(common)
+```
+```{r}
+for (i in 1:repeattimes) {
+  result <- Urn_v2(n+1, c("1","1","0"))
+  end[i] <- length(table(result)) - 1
+  common[i] <- max(table(result))
+}
+
+hist(end)
+hist(common)
+```

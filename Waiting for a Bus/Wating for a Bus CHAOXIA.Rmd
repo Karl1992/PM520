@@ -1,0 +1,112 @@
+---
+title: "Waiting for a Bus"
+author: "Chao XIA"
+date: "01/27/2019"
+output: pdf_document
+---
+
+## Question 1
+Suppose we arrive at a bus-stop at some fixed time during the day (say after 10 hours). How long, on average, do we have to wait for a bus?
+
+## Solution
+```{r}
+set.seed(2018)
+T_Wait_for_Bus <- numeric()
+T_Arrival <- 10
+repeattimes <- 10000
+for (i in 1: repeattimes){
+  Time_between_bus <- numeric()
+  Bus_After_Arrival <- 0
+  Bus_No <- 1
+  
+  while(Bus_After_Arrival < T_Arrival){
+    Time_between_bus[Bus_No] <- rexp(1)
+    Bus_After_Arrival <- Bus_After_Arrival + Time_between_bus[Bus_No]
+    Bus_No <- Bus_No + 1
+  }
+  T_Wait_for_Bus[i] <- Bus_After_Arrival - T_Arrival
+}
+Mean_T_Wait_for_Bus <- mean(T_Wait_for_Bus)
+cat('\nOn average, we have to wait', Mean_T_Wait_for_Bus, 'hours for a bus.')
+
+h <- hist(T_Wait_for_Bus, breaks = 15, freq = F, ylim = 0:1)
+par(new = T)
+curve(dexp(x), xlab = '', ylab = '', xlim = range(h$breaks), ylim = 0:1)
+```
+
+## Extension of Question 1
+What if we arrive at a random time each day?
+
+## Solution
+```{r}
+set.seed(2018)
+T_Wait_for_Bus <- numeric()
+repeattimes <- 10000
+for (i in 1: repeattimes){
+  Time_between_bus <- numeric()
+  T_Arrival <- runif(1,max = 24)
+  Bus_After_Arrival <- 0
+  Bus_No <- 1
+  
+  while(Bus_After_Arrival < T_Arrival){
+    Time_between_bus[Bus_No] <- rexp(1)
+    Bus_After_Arrival <- Bus_After_Arrival + Time_between_bus[Bus_No]
+    Bus_No <- Bus_No + 1
+  }
+  T_Wait_for_Bus[i] <- Bus_After_Arrival - T_Arrival
+}
+Mean_T_Wait_for_Bus <- mean(T_Wait_for_Bus)
+cat('\nOn average, we have to wait', Mean_T_Wait_for_Bus, 'hours for a bus.')
+
+h <- hist(T_Wait_for_Bus, breaks = 15, freq = F, ylim = 0:1)
+par(new = T)
+curve(dexp(x), xlab = '', ylab = '', xlim = range(h$breaks), ylim = 0:1)
+```
+## Question 2
+
+If we get off one bus and wait for the next one to arrive on the same route, how long, on average, do we have to wait?
+
+```{r}
+Time_between_bus <- rexp(repeattimes,1) 
+T_Wait_for_Bus_After_We_Get_Off <- mean(Time_between_bus)
+cat('\nIf we get off one bus and wait for the next one to arrive 
+on the same route, on average, we have to wait',T_Wait_for_Bus_After_We_Get_Off, 'hours.')
+```
+
+## Question 3
+
+How long on average was the time between the arrival of the bus we caught and the one before it.
+
+```{r}
+set.seed(2018)
+Time_between_busC_and_busP <- numeric()
+T_Arrival <- 10
+repeattimes <- 10000
+for (i in 1: repeattimes){
+  Time_between_bus <- numeric()
+  Bus_After_Arrival <- 0
+  Bus_No <- 1
+  
+  while(Bus_After_Arrival < T_Arrival){
+    Time_between_bus[Bus_No] <- rexp(1)
+    Bus_After_Arrival <- Bus_After_Arrival + Time_between_bus[Bus_No]
+    Bus_No <- Bus_No + 1
+  }
+  Time_between_busC_and_busP[i] <- Time_between_bus[Bus_No-1]
+}
+Mean_Time_between_busC_and_busP <- mean(Time_between_busC_and_busP)
+cat('\nOn average, the time between the arrival of the bus we caught and the one before it is', Mean_Time_between_busC_and_busP, 'hours .')
+h <- hist(Time_between_busC_and_busP, breaks = 15, freq = F) # time before and after will be both exponential distribution(reversibility, size-biased sampling)
+```
+
+## Question 4
+
+What is the expected time between any two buses?
+
+```{r}
+Time_between_bus <- rexp(repeattimes,1) 
+T_Wait_for_Bus_After_We_Get_Off <- mean(Time_between_bus)
+cat('\nThe expected time between any two buses',T_Wait_for_Bus_After_We_Get_Off, 'hours.') 
+```
+
+Actually, I think Question 2 and 4 are the same question.

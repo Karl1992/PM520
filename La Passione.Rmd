@@ -1,0 +1,167 @@
+---
+title: "Find the root by 2D Newton Raphson"
+author: "Chao XIA"
+date: "01/31/2019"
+output:
+  html_document:
+    df_print: paged
+---
+## Introduction
+
+### Basic Concept
+
+![](NR1.png){}\
+
+An illustration of one iteration of Newton's method (the function $f$ is shown in blue and the tangent line is in red). We see that $x_n + 1$ is a better approximation than xn for the root $x$ of the function $f$.
+
+$$
+x_{n+1} \ = x_n - \frac{f(x_n)}{f'(x_n)} 
+$$
+
+### Newton-Raphson to find roots
+
+1. Start at an arbitrary value
+
+2. Sequence $x_n$ converges to a root
+
+## 2D Newton-Raphson
+
+Instead of using distance of $f{x_n}$ and 0 to evaluate the tolerance, we will use mode of complex number to evaluate the tolerance.
+
+### The code
+
+```{r}
+# Then we need a function to generate roots
+TwoDNewtonRaphson <- function(func, startingvalue, MaxnumberofIterations, Tolerance){
+  Dev <- complex(real = 10000, imaginary = 10000)
+  i <- 0
+  x <- startingvalue
+  while (i < MaxnumberofIterations && Mod(Dev) > Mod(Tolerance)) {
+    fx <- func(x)
+    if (is.nan(fx[1]) || is.nan(fx[2])){
+      break
+    }
+    x <- x - fx[1] / fx[2]
+    Dev <- fx[1]
+    i <- i + 1
+  }
+  return(c(x,i))
+}
+```
+
+## Do the plot thing
+
+### Preparation
+```{r}
+# First we should have a function to generate  f(x) and f'(x)
+Fomula <- function(x){
+  return(c(x^5 + x - 3, 5*x^4+1))
+}
+
+# We also need a function to compare if two roots is close
+CloseTo<-function(m,n){
+  if (Mod(m - n) < 0.01){
+    return(1)
+  }else{
+    return (0)
+  }  
+}
+
+# color, repeattimes, roots, starting value, things to plot storations
+xmax <- 300
+ymax <- 300
+starting <- mat.or.vec(xmax,ymax)
+root <- mat.or.vec(xmax,ymax)
+repeattimes <- mat.or.vec(xmax,ymax)
+Color <- mat.or.vec(xmax,ymax)
+Color2 <- mat.or.vec(xmax,ymax)
+allroot <- numeric()
+alltimes <- numeric()
+ThingstoPlot <- numeric()
+ThingstoPlot2 <- numeric()
+
+# Starting value generator
+a <- seq(0,2,length.out = xmax)
+b <- seq(0,2,length.out = ymax)
+
+# Calculate the root and store all roots
+for (i in 1:xmax){
+  for (j in 1:ymax){
+    starting[i,j] <- complex(real = a[i], imaginary = b[j])
+    Result <- TwoDNewtonRaphson(Fomula, starting[i,j], 10000, complex(real = 1E-05, imaginary = 1E-05))
+    root[i,j] <- Result[1]
+    repeattimes[i,j] <- as.integer(Result[2])
+    
+    Judge <- 0
+    if (is.na(root[i,j]) == 0){
+      if (length(allroot) == 0){
+        allroot[1] <- root[1,1]
+      }else{
+        Judge <- 0
+        for (k in 1:length(allroot)){
+          if (CloseTo(root[i,j],allroot[k]) == 0){
+            Judge <- Judge + 1
+          }
+        }
+      }
+      if (Judge == length(allroot)){
+        allroot[length(allroot)+1] <- root[i,j]
+      }
+    }
+    
+    if (!repeattimes[i,j] %in% alltimes){
+      alltimes[length(alltimes) + 1] <- repeattimes[i,j]
+    }
+  }
+}
+```
+
+### Store the information
+
+```{r}
+# Store information to things to plot
+for (i in 1:xmax){
+  for (j in 1:ymax){
+    Color[i,j]<-'black'
+    for (k in 1:length(allroot)){
+      if (CloseTo(root[i,j],allroot[k])){
+        Color[i,j] <- k  
+      }
+    }
+    ThingstoPlot <- rbind(ThingstoPlot, c(Re(starting[i,j]),Im(starting[i,j]), Color[i,j]))
+  }
+}
+
+for (i in 1:xmax){
+  for (j in 1:ymax){
+    Color2[i,j]<-'black'
+    Color2[i,j] <- which(alltimes == repeattimes[i,j])
+    ThingstoPlot2 <- rbind(ThingstoPlot2, c(Re(starting[i,j]),Im(starting[i,j]), Color2[i,j]))
+  }
+}
+```
+
+### Plot picture
+
+```{r}
+library(dplyr)
+library(ggplot2)
+ThingstoPlotG <- as.data.frame(ThingstoPlot, row.names, stringsAsFactors = F)
+names(ThingstoPlotG) <- c("x", "y", "color")
+ThingstoPlotG$x <- as.numeric(ThingstoPlotG$x)
+ThingstoPlotG$y <- as.numeric(ThingstoPlotG$y)
+#Star_Platinum <- 
+ggplot(ThingstoPlotG, aes(x,y,color = color))+geom_point(alpha = 0.1)+scale_colour_manual(values = c(cm.colors(length(allroot))))+theme_bw()+theme(axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(), axis.title.y=element_blank(), axis.text.y=element_blank(), axis.ticks.y=element_blank(), legend.position = "none", panel.grid = element_blank(), panel.border = element_blank())
+# ggsave(Star_Platinum, file = "Star Platinum.jpg", width = 4, height = 4)
+
+ThingstoPlotG2 <- as.data.frame(ThingstoPlot2, row.names(c("x", "y", "color")), stringsAsFactors = F)
+names(ThingstoPlotG2) <- c("x", "y", "color")
+ThingstoPlotG2$x <- as.numeric(ThingstoPlotG2$x)
+ThingstoPlotG2$y <- as.numeric(ThingstoPlotG2$y)
+# La_Passione <- 
+ggplot(ThingstoPlotG2, aes(x,y, color = color))+geom_point(alpha = 0.1)+scale_color_manual(values = c(heat.colors(length(alltimes))))+theme_bw()+theme(axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(), axis.title.y=element_blank(), axis.text.y=element_blank(), axis.ticks.y=element_blank(), legend.position = "none", panel.grid = element_blank(), panel.border = element_blank())
+# ggsave(La_Passione, file = "La Passione.jpg", width = 4, height = 4)
+```
+
+## Discussion
+We can find the distribution of root and iteration time are repearted if we enlarge the graphic. It is called self adaptability. I think it is just like crystal. But why would it be like that? Is it because our calculation is just like the rule of natural? I can't answer this question. 

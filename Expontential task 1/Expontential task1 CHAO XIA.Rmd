@@ -1,0 +1,57 @@
+---
+title: "Expotential task 1"
+author: "Chao XIA"
+date: "01/14/2019"
+output: 
+  pdf_document:
+    includes:
+      in_header: header.tex
+    keep_tex: yes
+    latex_engine: xelatex
+---
+## Generate X1 with exponential distribution larger than y
+
+```{r}
+set.seed(2018)
+X1<-numeric()
+GenerateX1<-function(y,t){
+  x<-0
+  while (x<y){
+    x <- rexp(1,t)
+  }
+  return(x)
+}
+n = 1000
+for (i in 1:n){
+  X1[i] = GenerateX1(1,1)
+}
+```
+
+## Plot histogram and Density Curve
+
+```{r}
+X2 <- rexp(1000,1)
+output <- X1-1
+
+par(mfrow = c(1,2))
+h <- hist(output, main = 'Output', xlab = 'X1-1', ylim = 0:1, freq = F, breaks = 10)
+par(new = T)
+curve(dexp(x), col = 'red', lwd = 2, xlab = '', ylab = '', xlim = range(h$breaks), ylim = 0:1)
+hist(X2, main = 'Contrast', freq = F, breaks = 10, ylim = 0:1)
+```
+## Discussion
+
+From the these two figure, we found that the distribution of exponential conditional on y and t is just as same as the exponential density function.
+
+I think this is because the memoryless property of Expotential Distribution, which means:
+
+$$
+P(T>s+t|T>t) = P(T>s)
+$$
+In this example,
+$$\begin{split}
+&P(T>0+1|T>1) = P(T>0) \\
+&P(T>1+1|T>1) = P(T>1) \\
+&and\ so\ on
+\end{split}$$
+it is obvious that their distribution will be the same.

@@ -1,0 +1,274 @@
+---
+title: "Decoding"
+author: "Chao XIA"
+date: "03/24/2019"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Decoding
+
+## Stimulated appealing
+
+1. We should use likelihood as the parameter to calculate dE.
+
+2. Since the likelihood is too small, we should log the likelihood.
+
+```{r}
+SA <- function(InitialT, FinalT, Tdecreaserate, Startvalue, dict, text){
+  Temp <- InitialT
+  log_p_pre <- Startvalue
+  old_dictionary <- dict
+  while(Temp > FinalT){
+    
+    log_p_new <- numeric()
+    
+    new_dictionary <- old_dictionary
+    
+    change <- sample(26,2)
+    
+    inter <- new_dictionary[change[1]] 
+    new_dictionary[change[1]] <- new_dictionary[change[2]] 
+    new_dictionary[change[2]] <- inter
+    
+    for (str in text){
+      len <- nchar(str)
+      str <- substring(str, 1:len, 1:len)
+      newstr <- vector("character")
+      for(i in 1:length(str)){
+          letter <- tolower(str[i])
+          index <- which(letterseq == letter)
+          newstr[i] <- new_dictionary[index]
+      }
+      
+      # calculate each word's probablity in real life
+      letterindex <- numeric()
+      for(i in 1:length(newstr)){
+        letter <- tolower(newstr[i])
+        letterindex[i] <- which(letterseq == letter)
+      }
+      
+      p <- sum(freqlist[letterindex[1], ])
+      if(length(letterindex) == 1){
+        p <- p
+      }else{
+        p <- p * freqlist[letterindex[i-1],letterindex[i]] / sum(freqlist[letterindex[i-1],])
+      }
+      logp <- log(p)
+      log_p_new <- c(log_p_new, logp)
+    }
+    
+    dE <- sum(log_p_new) - sum(log_p_pre)
+    
+    prob <- runif(1)
+    
+    h <- min(1, exp(dE/Temp))
+    
+    if(prob < h){
+      old_dictionary <- new_dictionary
+      log_p_pre <- log_p_new
+    }
+    
+    Temp <- Temp * (1 - Tdecreaserate)
+  }
+  
+  return(old_dictionary)
+}
+```
+
+## Some initial settings
+
+### Initialize the dictionary
+
+```{r}
+letterseq <- letters[seq(1:26)]
+
+dictionary <- letters[seq(1:26)]
+```
+
+### Read the Pairs frequecies
+
+```{r}
+Pairsfreqs <- readLines("D:/study/MasterinUSC/pm520/week6/LetterPairFreqFrom7Novels.txt")
+
+# Transform the text into numeric
+freqlist_char <- mat.or.vec(26, 26)
+freqlist <- mat.or.vec(26, 26)
+for (i in 1:length(Pairsfreqs)){
+  freqlist_char[i,] <- strsplit(Pairsfreqs[i], ' ')[[1]]
+}
+
+for (i in 1:26){
+  for (j in 1:26){
+    freqlist[i,j] <- as.numeric(freqlist_char[i,j])
+  }
+}
+```
+
+## Test 1
+
+### Read the encoded text
+
+```{r}
+Input <- readLines("D:/study/MasterinUSC/pm520/week6/CodedMessage_Short.txt", n = 1000)
+```
+
+### Split the text into strings
+
+```{r}
+Input.split <- strsplit(Input, ' ')[[1]]
+
+# delete the punctuation
+library(stringr)
+Input_new <- str_replace_all(Input, "[[:punct:]]", "")
+Input_new.split <- strsplit(Input_new, ' ')[[1]]
+```
+### Calculate the possibility of initial status
+
+```{r}
+log_p_old <- numeric()
+
+for (str in Input_new.split){
+  len <- nchar(str)
+  str <- substring(str, 1:len, 1:len)
+  newstr <- vector("character")
+  for(i in 1:length(str)){
+      letter <- tolower(str[i])
+      index <- which(letterseq == letter)
+      newstr[i] <- dictionary[index]
+  }
+  
+  # calculate each word's probablity in real life
+  letterindex <- numeric()
+  for(i in 1:length(newstr)){
+    letter <- tolower(newstr[i])
+    letterindex[i] <- which(letterseq == letter)
+  }
+  
+  p <- sum(freqlist[letterindex[1], ])
+  if(length(letterindex) == 1){
+    p <- p
+  }else{
+    p <- p * freqlist[letterindex[i-1],letterindex[i]] / sum(freqlist[letterindex[i-1],])
+  }
+  logp <- log(p)
+  log_p_old <- c(log_p_old, logp)
+}
+```
+
+### SA
+```{r}
+set.seed(20190324)
+real_dict <- SA(100, 0.001, 0.0001, log_p_old, dictionary, Input_new.split)
+```
+
+```{r}
+decode <- vector("character")
+
+for (str in Input.split){
+  len <- nchar(str)
+  str <- substring(str, 1:len, 1:len)
+  newstr <- vector("character")
+  for(i in 1:length(str)){
+    letter <- tolower(str[i])
+    if(letter %in% letterseq){
+      index <- which(letterseq == letter)
+      newstr[i] <- real_dict[index]
+    }else{
+      newstr[i] <- letter
+    }
+  }
+  decode <- c(decode, paste(newstr, collapse = ''))
+}
+
+paste(decode, collapse = ' ')
+```
+
+## Test 2
+
+### Read the encoded text
+
+```{r}
+Input <- readLines('D:/study/MasterinUSC/pm520/week6/CodedMessage_Med.txt', n = 1000)
+```
+
+### Split the text into strings
+
+```{r}
+Input.split <- strsplit(Input, ' ')[[1]]
+
+# delete the punctuation
+Input_new <- str_replace_all(Input, "[[:punct:]]", "")
+Input_new.split <- strsplit(Input_new, ' ')[[1]]
+Input_new.split <- Input_new.split[-which(Input_new.split == '')]
+```
+
+### Calculate the possibility of initial status
+
+```{r}
+log_p_old <- numeric()
+
+for (str in Input_new.split){
+  len <- nchar(str)
+  str <- substring(str, 1:len, 1:len)
+  newstr <- vector("character")
+  for(i in 1:length(str)){
+      letter <- tolower(str[i])
+      index <- which(letterseq == letter)
+      newstr[i] <- dictionary[index]
+  }
+  
+  # calculate each word's probablity in real life
+  letterindex <- numeric()
+  for(i in 1:length(newstr)){
+    letter <- tolower(newstr[i])
+    letterindex[i] <- which(letterseq == letter)
+  }
+  
+  p <- sum(freqlist[letterindex[1], ])
+  if(length(letterindex) == 1){
+    p <- p
+  }else{
+    p <- p * freqlist[letterindex[i-1],letterindex[i]] / sum(freqlist[letterindex[i-1],])
+  }
+  logp <- log(p)
+  log_p_old <- c(log_p_old, logp)
+}
+```
+
+### SA
+
+```{r}
+set.seed(20190324)
+real_dict <- SA(100, 0.001, 0.001, log_p_old, dictionary, Input_new.split)
+```
+
+```{r}
+decode <- vector("character")
+
+log_p_old <- numeric()
+
+for (str in Input.split){
+  len <- nchar(str)
+  str <- substring(str, 1:len, 1:len)
+  newstr <- vector("character")
+  for(i in 1:length(str)){
+    letter <- tolower(str[i])
+    if(letter %in% letterseq){
+      index <- which(letterseq == letter)
+      newstr[i] <- real_dict[index]
+    }else{
+      newstr[i] <- letter
+    }
+  }
+  decode <- c(decode, paste(newstr, collapse = ''))
+}
+
+paste(decode, collapse = ' ')
+```
+
+
+## Discussion
+
+When using SA, we can find that for more complex question we need more iteration times, which means we will get lower temperature decrease rate. 

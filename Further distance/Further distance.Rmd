@@ -1,0 +1,68 @@
+---
+title: "Further distance"
+author: "Chao XIA"
+date: "01/15/2019"
+output: pdf_document
+---
+## Question
+
+For fixed area A, is the expected distance between two randomly chosen points, E(d), bigger for a square or a rectangle?
+
+## Solution
+For this question, we can randomly select one side of rectangle with area A and do this multiple times.
+
+```{r}
+# Several global variable
+A <- 100
+a <- sqrt(A) # calcualte side of a square
+distanceamount<-10000 # amount of distance between two points in a rectangle or square
+amountofrectangular<-100 # amount of different rectangles in this trial
+
+# calcualte the distance
+distance<-function(c1,c2){
+  m <- rbind(c1,c2)
+  return(dist(m))
+  
+}
+
+# define some vectors
+r <- numeric() # distances in a rectangular
+s <- numeric() # distances in a square
+avr <- numeric() # different E(d)s
+judge <- numeric() # judge if E(d) is bigger than D
+
+# Calculate D
+for( i in 1:distanceamount){
+    s1 <- runif(2,0,a)
+    s2 <- runif(2,0,a)
+    s[i] <- distance(s1,s2)
+}
+avs <- mean(s)
+
+# Start the trial
+for( i in 1:amountofrectangular){
+  for(j in 1:distanceamount){
+    ra <- runif(1,0,100)
+    rb <- 100/ra
+    r1 <- c(runif(1,0,ra),runif(1,0,rb))
+    r2 <- c(runif(1,0,ra),runif(1,0,rb))
+    r[j] <- distance(r1,r2)
+    s[j] <- distance(s1,s2)  
+  }
+  avr[i] <- mean(r)
+  judge[i] <- avr[i]>avs
+}
+
+count <- sum(judge)
+p <- count/amountofrectangular
+
+cat("\nSo our p-value is: ",p)
+```
+
+## Conclusion
+The trial was repeated with 100 different rectangles. 
+
+The result is that E(d) is always bigger than D with a p-value of 1.
+
+
+

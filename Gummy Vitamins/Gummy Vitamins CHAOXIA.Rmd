@@ -1,0 +1,56 @@
+---
+title: "Gummy Vitamin"
+author: "Chao XIA"
+date: "02/10/2019"
+output: pdf_document
+---
+## "Riddler" Questions - The Easy one
+You and your spouse each take two gummy vitamins every day.
+
+You share a single bottle of 60 vitamins, which come in two flavors. You each prefer
+a different flavor, but it seems childish to fish out two of each type.
+
+So you just take the first four that fall out and then divide them up according to your
+preferences. For example, if there are two of each flavor, you and your spouse get the
+vitamins you prefer, but if three of your preferred flavor come out, you get two of the
+ones you like and your spouse will get one of each.
+
+On average, what percentage of the vitamins you take are the flavor you prefer?
+
+(Assume that the bottle starts out with a 50-50 split between flavors, and that the
+four selected each day are selected uniformly at random.)
+
+## Solution
+```{r}
+set.seed(80)
+p <- numeric() #Retainer of probability of you take falvor you prefer for each 15 days (60 vitamins and 4 each day)
+
+n <- 10000 # 
+
+for (j in 1:n){
+  all_vitamins_remain <- sample(1:2, 60, replace = T) # You like 1 and your spouse likes 2.
+  
+  pick_percentage <- numeric() # Store the flavor you preferred you take each day
+  
+  for (i in 1:15){
+    
+    today_pick <- sample(1:length(all_vitamins_remain), 4) # What number of vitamins should you choose today.
+    
+    all_vitamins_pick <- all_vitamins_remain[today_pick] # Pick it out
+    
+    all_vitamins_remain <- all_vitamins_remain[-today_pick] # Remain others
+    
+    if (sum(all_vitamins_pick == 1) >= 2){ # If there are two or more with the flavor you preferred, you take two.
+      pick_percentage[i] <- 2
+      
+    }else{ # If not, you can only get 0 or 1 plus other flavor you don't like.
+      pick_percentage[i] <- sum(all_vitamins_pick == 1)
+    }
+  }
+  p[j] <- sum(pick_percentage) / 30 # calculate the pecentage
+}
+
+mean(p) # see the expectation
+
+hist(p) # see the histogram 
+```

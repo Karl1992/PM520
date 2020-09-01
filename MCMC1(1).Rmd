@@ -1,0 +1,133 @@
+---
+title: "MCMC1"
+author: "Paul M"
+date: "February 23, 2016"
+output: pdf_document
+---
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the "Knit"" button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. 
+
+This example is taken from https://cran.r-project.org/web/packages/mcmc/vignettes/demo.pdf
+It uses a dataset 'logit' from the mcmc package:
+
+```{r}
+library(mcmc)
+data(logit)
+```
+
+We are going to buld a linear model and analyze it using MCMC.
+The data looks like this:
+```{r}
+head(logit)
+summary(logit)
+```
+
+
+For comparison, the frequentist analysis of this dataset follows.
+We are using a logit link, so we are modeling it as log (p/(1-p)) ~ x1 + x2 + x3 + x4
+```{r}
+out <- glm(y ~ x1 + x2 + x3 + x4, data = logit,family = binomial(), x = TRUE)
+mle.out<-out  # save it for later use
+summary(out)
+
+x <- out$x  # we record these to use in our later mcmc run
+y <- out$y  # we also record the outcomes y
+
+```
+
+For our Bayesian analysis we assume the same data model as the frequentist, and we assume the prior distribution of the five parameters (the regression coefficients) makes them independent and identically normally distributed with mean 0 and standard deviation 2.
+The log unnormalized posterior (log likelihood plus log prior) density for this model is calculated by the following R function (given the preceding data definitions). Note that we can rearrange the logistic regression statement to get p(y=1) = exp(beta0+x.beta)/[1+exp(beta0+x.beta).
+```{r}
+lupost <- function(beta, x, y) {  # beta is the parameter vector, x and y are our independent and dependent variables
+    eta <- as.numeric(x %*% beta)   # %*% gives the dot (or vector) product. It will do it for each row of x
+    logp <- ifelse(eta < 0, eta - log1p(exp(eta)), - log1p(exp(- eta)))
+    logq <- ifelse(eta < 0, - log1p(exp(eta)), - eta - log1p(exp(- eta)))
+    # the R function log1p, calculates the function x -> log(1+x)
+    logl <- sum(logp[y == 1]) + sum(logq[y == 0])  # this is the log likelihood of y given the current betas
+    logprior <-  -1*sum(beta^2) / 8  # this is the prior density of the betas
+ return(logl + logprior)  
+}
+```
+
+With those definitions in place, the following code runs the Metropolis algorithm to simulate the posterior.
+```{r}
+set.seed(42)    # to get reproducible results
+beta.init <- as.numeric(coefficients(out))  # this is our start point - we start from the fitted glm estimates
+out <- metrop(lupost, beta.init, nbatch=1e3, x = x, y = y)  # the last two arguments are for the lupost function
+names(out)
+
+out$accept
+```
+
+The acceptance rate is low (~20% is considered optimal, but this is very much a rule of thumb, so be careful). So we try again.
+Note that the size of proposals is controlled by an argument called 'scale', which defaults to =1. 
+Proposals add a normal(0,scale^2) random variable to the current parameter values, for each parameter
+By using out (the last fit) as an argument, we start it from wherever the last chain left off.
+```{r}
+out <- metrop(out, scale = 0.1, x = x, y = y)
+out$accept
+
+out <- metrop(out, scale = 0.3, x = x, y = y)
+out$accept
+
+out <- metrop(out, scale = 0.5, x = x, y = y)
+out$accept
+
+out <- metrop(out, scale = 0.4, x = x, y = y)
+out$accept
+```
+
+Now the acceptance rate is about right, so we perform a longer run:
+```{r}
+out <- metrop(out, nbatch = 1e4, scale=0.4, x = x, y = y)
+out$accept
+out$time
+```
+
+Now let's look at some diagnostic output:
+```{r}
+plot(ts(out$batch))
+acf(out$batch)
+```
+
+The autocorrelation plots seem to show that the the autocorrelations are negligible after about lag 25. This diagnostic inference is reliable if the sampler is actually working (has nearly reached equilibrium) and worthless otherwise. Thus sampling every 25th iteration should be sufficient, but let's use nspac=50 to be safe.
+nbatch is the number of "batches";
+blen is the length of batches.
+nspace is the spacing of iterations that contribute to batches.
+```{r}
+out<-metrop(out,nbatch = 1e4,nspac=50,blen=1, scale=0.4,x=x, y=y)
+out$accept
+```
+
+The grand means (means of batch means) are
+```{r}
+apply(out$batch, 2, mean)
+```
+
+Next, let's construct histograms of our output, with the mle estimates marked
+```{r}
+hist(out$batch[,1])
+abline(v=mle.out$coefficients[1],col="red",lwd=3)
+hist(out$batch[,2])
+abline(v=mle.out$coefficients[2],col="red",lwd=3)
+hist(out$batch[,3])
+abline(v=mle.out$coefficients[3],col="red",lwd=3)
+hist(out$batch[,4])
+abline(v=mle.out$coefficients[4],col="red",lwd=3)
+hist(out$batch[,5])
+abline(v=mle.out$coefficients[5],col="red",lwd=3)
+```
+
+Finally, let's look at bi-variate scatter plots, just in case we see any interesting correlations
+```{r}
+op<-par()
+par(mfrow=c(5,5),mar=c(1,1,1,1))
+for (i in 1:5){
+  for (j in 1:5){
+    plot(out$batch[,i],out$batch[,j],pch='.')
+  }
+}
+par(op)
+```

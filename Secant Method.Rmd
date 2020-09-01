@@ -1,0 +1,130 @@
+---
+title: "Secant Method"
+author: "Chao XIA"
+date: "02/02/2019"
+output:
+  html_document:
+    df_print: paged
+---
+## Introduction
+
+Use an approximation to the derivative formed by a straight line put through the last two 'guesses'
+
+Example:
+
+![](SM1.png){}\
+
+## Secant Method Code
+
+```{r}
+# define Secant Method
+
+SM <- function(func, startingvalue, tolerance = 1E-05, maxnumbers = 10000){
+  b <- (func(startingvalue[1]) - func(startingvalue[2])) / (startingvalue[1] - startingvalue[2])
+  a <- func(startingvalue[1]) - b * startingvalue[1]
+  point <- matrix(c(startingvalue, a, b))
+  i <- 1
+  Dev <- 10000
+  while(Dev > tolerance & i < maxnumbers){
+    i <- i+1
+    x <- -point[3, i-1] / point[4,i-1]
+    co <- (func(point[2, i-1]) - func(x)) / (point[2, i-1] - x)
+    inter <- func(x) - co * x
+    point <- cbind(point, c(x, point[1, i-1], inter, co))
+    Dev <- abs(func(x))
+  }
+  return(point)
+}
+```
+```{r}
+# define Newton Raphson function
+NewtonRaphson <- function(func, startingvalue, MaxnumberofIterations, Tolerance){
+  Dev <- 10000
+  i <- 0
+  x <- startingvalue
+  while (i < MaxnumberofIterations & Dev > Tolerance) {
+    fx <- func(x)
+    if (is.nan(fx[1]) || is.nan(fx[2])){
+      break
+    }
+    abline(b = fx[2], a = fx[1] - fx[2] * x, col = "red", lty = 2)
+    segments(x, 0, x, fx[1], col = "blue", lty = 2)
+    x <- x - fx[1] / fx[2]
+    Dev <- abs(fx[1])
+    i <- i + 1
+  }
+  return(c(x,i))
+}
+```
+
+## Test the code of secant method
+
+```{r}
+# define functions
+
+fx1 <- function(x){
+  return(cos(x) - x)
+}
+
+fx2 <- function(x){
+  return(log(x) - exp(-x))
+}
+
+fx3 <- function(x){
+  return(c(cos(x) - x, -sin(x) - 1))
+}
+
+fx4 <- function(x){
+  return(c(log(x) - exp(-x), 1/x + exp(-x)))
+}
+```
+```{r}
+# generate the result and figure
+ResultSM1 <- SM(fx1, c(1,2))
+curve(cos(x) - x, 0, pi, ylim = c(-3, 1), main = "cos(x) - x")
+abline(h = 0, v = 0)
+for(j in 1:ncol(ResultSM1)){
+  segments(ResultSM1[1,j], 0, ResultSM1[1,j], fx1(ResultSM1[1,j]), col = "blue", lty = 2)
+  segments(ResultSM1[2,j], 0, ResultSM1[2,j], fx1(ResultSM1[2,j]), col = "blue", lty = 2)
+  abline(b = ResultSM1[4,j], a = ResultSM1[3,j], col = "red", lty = 2)
+}
+```
+```{r}
+curve(cos(x) - x, 0, 1/2*pi, ylim = c(-1,1), main = "cos(x) - x", lwd = 1)
+abline(h = 0, v = 0)
+NR1 <- NewtonRaphson(fx3, 1, 10000, 1E-05)
+```
+
+```{r}
+# generate the result and figure
+ResultSM2 <- SM(fx2, c(1,2))
+curve(log(x) - exp(-x), xlim = c(0.1, 2.5), ylim = c(-1, 1), main = "log(x) - exp(-x)")
+abline(h = 0, v = 0)
+for(j in 1:ncol(ResultSM2)){
+  segments(ResultSM2[1,j], 0, ResultSM2[1,j], fx2(ResultSM2[1,j]), col = "blue", lty = 2)
+  segments(ResultSM2[2,j], 0, ResultSM2[2,j], fx2(ResultSM2[2,j]), col = "blue", lty = 2)
+  abline(b = ResultSM2[4,j], a = ResultSM2[3,j], col = "red", lty = 2)
+}
+```
+
+```{r}
+curve(log(x) - exp(-x), xlim = c(0.1, 2.5), ylim = c(-1, 1), main = "log(x) - exp(-x)")
+abline(h = 0, v = 0)
+NR2 <- NewtonRaphson(fx4, 2, 10000, 1E-05)
+```
+
+## Discussion
+
+Compare the result and iteration times of Secant Method and Newton-Rapthon Method.
+
+```{r}
+Comparison <- rbind(c(ResultSM1[1,ncol(ResultSM1)],ncol(ResultSM1),fx1(ResultSM1[1,ncol(ResultSM1)])),c(NR1,fx1(NR1[1])), c(ResultSM2[1,ncol(ResultSM2)], ncol(ResultSM2),fx2(ResultSM2[1,ncol(ResultSM2)])),c(NR2,fx2(NR2[1])))
+row.names(Comparison) <- c("SM1","NR1","SM2","NR2")
+colnames(Comparison) <- c("x","iterations","fx")
+Comparison
+```
+From the comparison, we find that for secant method, the root can always be found with close iteration times but less accurracy than Newton-Rapthon Method but also close. In such case, for some funcuion that can not easily be derived, secant method will be a good replacement to evaluate the root of a function.
+
+
+
+

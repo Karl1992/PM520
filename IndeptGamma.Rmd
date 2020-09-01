@@ -1,0 +1,139 @@
+---
+title: "IndeptGamma"
+author: "Chao XIA"
+date: "03/23/2019"
+output: pdf_document
+---
+
+# IndeptGamma
+
+## General Function
+
+```{r}
+gamm<-function (n, a, b) 
+{
+  mu <- a/b   # the mean of the gamma distribution
+  sig <- sqrt(a/(b * b))   # the stadard deviation of the gamma distn
+  vec <- vector("numeric", n)   # this is where we are going to put the random variables we generate
+  x <- a/b 
+  vec[1] <- x # We arbitrarily start the MCMC process at the mean
+  for (i in 2:n) {
+    can <- rnorm(1, mu, sig)
+    hprob <- min(1, (dgamma(can, a, b)/dgamma(x,a,b))/(dnorm(can, mu, sig)/dnorm(x, mu, sig)))
+    u <- runif(1)
+    if (u < hprob) 
+      x <- can
+    vec[i] <- x
+  }
+  return (vec)
+}
+```
+
+## Test on Gamma(2.3, 2.7)
+
+```{r}
+set.seed(20190323)
+vec1<-gamm(100000,2.3,2.7)
+par(mfrow=c(1,1))
+plot(ts(vec1))
+plot(ts(vec1)[1:1000],type='l')
+acf(vec1)
+hist(vec1[1000:100000], breaks = 30, freq = F, xlim = c(0,3), ylim = c(0,1))
+par(new = T)
+curve(dgamma(x,2.3,2.7), xlab = "", ylab = "", xlim = c(0,3),ylim = c(0,1), xaxt = "n", yaxt = "n")
+```
+
+```{r}
+library(coda)
+set.seed(20190323)
+chain1_a <- gamm(100000,2.3,2.7) 
+chain1_b <- gamm(100000,2.3,2.7)
+chain1_a <- mcmc(chain1_a, start = 1000)
+chain1_b <- mcmc(chain1_b, start = 1000)
+chain1 <- mcmc.list(list(chain1_a, chain1_b))
+gelman.plot(chain1)
+gelman.diag(chain1)
+```
+
+From the acf, curve and gelman test, we found that the MCMC worked well on gamma(2.3, 2.7), but what will happen if we change the parameter into gamma(0.1, 0.01)?
+
+## Test on Gamma(0.1, 0.01)
+```{r}
+set.seed(20190323)
+vec2<-gamm(100000,0.1,0.01)
+par(mfrow = c(1,1))
+plot(ts(vec2))
+plot(ts(vec2)[1:1000], type = "l")
+acf(vec2)
+hist(vec2[1000:100000], breaks = 100, freq = F, xlim = c(0,100), ylim = c(0,0.35))
+par(new = T)
+curve(dgamma(x,0.1,0.01), xlab = "", ylab = "", xlim = c(0,100), ylim = c(0,0.35), xaxt = "n", yaxt = "n")
+```
+
+```{r}
+set.seed(20190323)
+chain2_a <- gamm(100000,0.1,0.01) 
+chain2_b <- gamm(100000,0.1,0.01)
+chain2_a <- mcmc(chain2_a, start = 1000)
+chain2_b <- mcmc(chain2_b, start = 1000)
+chain2 <- mcmc.list(list(chain2_a, chain2_b))
+gelman.plot(chain2)
+gelman.diag(chain2)
+```
+
+The gelman test shows that the MC chain works well, but from acf, plot and curve, there shows some stucks in the iterations. In such case, we should modify the gamma function by changing the way of producing new candidate or adding q(x->x') into the function. I will choose to add q(x->x')
+
+## Adding q(x->x')
+```{r}
+gamm_modified_1<-function (n, a, b, prob) 
+{
+  mu <- a/b   # the mean of the gamma distribution
+  sig <- sqrt(a/(b * b))   # the stadard deviation of the gamma distn
+  vec <- vector("numeric", n)   # this is where we are going to put the random variables we generate
+  x <- a/b 
+  vec[1] <- x # We arbitrarily start the MCMC process at the mean
+  for (i in 2:n) {
+    can <- rnorm(1, mu, sig)
+    hprob <- min(1, ((dgamma(can, a, b)*prob)/(dgamma(x,a,b)*(1-prob)))/(dnorm(can, mu, sig)/dnorm(x, mu, sig)))
+    u <- runif(1)
+    if (u < hprob) 
+      x <- can
+    vec[i] <- x
+  }
+  return (vec)
+}
+```
+
+```{r}
+set.seed(20190323)
+Pz <- seq(0.05, 0.95, length.out = 19)
+for(i in Pz){
+  newvec <- gamm_modified_1(100000,0.1,0.01,i)
+  par(mfrow = c(2,2))
+  plot(ts(newvec))
+  plot(ts(newvec)[1:1000], type = "l")
+  acf(newvec)
+  hist(newvec[1000:100000], breaks = 100, freq = F, xlim = c(0,100), ylim = c(0,0.35))
+  par(new = T)
+  curve(dgamma(x,0.1,0.01), xlab = "", ylab = "", xlim = c(0,100), ylim = c(0,0.35), xaxt = "n", yaxt = "n")
+}
+```
+
+We found that when q(x->x') = 0.9, the acf is the best and with no stuck.
+
+We'll use gelman test to test the assumptiom.
+
+```{r}
+set.seed(20190323)
+chain3_a <- gamm_modified_1(100000,0.1,0.01,0.9) 
+chain3_b <- gamm_modified_1(100000,0.1,0.01,0.9)
+chain3_a <- mcmc(chain3_a, start = 1000)
+chain3_b <- mcmc(chain3_b, start = 1000)
+chain3 <- mcmc.list(list(chain3_a, chain3_b))
+gelman.plot(chain3)
+gelman.diag(chain3)
+```
+
+We can clearly see that the performance is better when q(x->x') = 0.9.
+
+

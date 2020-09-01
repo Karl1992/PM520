@@ -1,0 +1,172 @@
+---
+title: "Gibbs Sampling"
+author: "Chao XIA"
+date: "03/25/2019"
+output: pdf_document
+---
+## Some initial settings
+
+### Packages
+
+```{r}
+library(coda)
+library(mcmc)
+library(mvtnorm)
+library(adaptMCMC)
+```
+
+### Initial data
+```{r}
+set.seed(20190325)
+t <- 100
+mu.vector <- c(0,0)
+variance_matrix <- cbind(c(1,0.9), c(0.9,1))
+our.data <- rmvnorm(t, mu.vector, variance_matrix)
+```
+
+## Gibbs Sampling
+
+```{r}
+gibbs <- function(rou, n, initial){
+  iter <- 1
+  result <- mat.or.vec(n,2)
+  theta <- initial[t,1]
+  mu <- initial[t,2]
+  while (iter <= n){
+    thetaprime <- rnorm(1, rou * mu, 1 - rou^2)
+    muprime <- rnorm(1, rou * theta, 1 - rou^2)
+    theta <- thetaprime
+    mu <- muprime
+    result[iter,] <- c(theta, mu)
+    iter <- iter + 1
+  }
+  return(result)
+}
+
+gibbs_r1 <- gibbs(0.9, 100000, our.data)
+gibbs_r2 <- gibbs(0.9, 100000, our.data)
+gibbs_r3 <- gibbs(0.9, 100000, our.data)
+
+corr_gibbs <- cor(gibbs_r1[,1], gibbs_r1[,2])
+
+gibbs_r1 <- mcmc(gibbs_r1)
+print(summary(gibbs_r1))
+autocorr.plot(gibbs_r1, lag = 100, main = "Autocorrelation for gibbs_r1")
+
+gibbs_r2 <- mcmc(gibbs_r2)
+gibbs_r3 <- mcmc(gibbs_r3)
+
+gibbs_r <- mcmc.list(list(gibbs_r1, gibbs_r2, gibbs_r3))
+
+cat("\nGelman test results follow...")
+print(gelman.diag(gibbs_r))
+gelman.plot(gibbs_r, main = "Gelman plots")
+
+plot(gibbs_r1, main = "Results for gibbs_r1")
+plot(gibbs_r2, main = "Results for gibbs_r2")
+acf(gibbs_r2)
+```
+
+## MHMCMC
+```{r}
+do.MHMCMC<-function(number.of.iterations, current.mu, variance.matrix){
+  # define a vector to store the output of the MH-MCMC process
+  posterior.mu<-mat.or.vec(number.of.iterations,2)
+  
+  for (i in 1:number.of.iterations){
+    #apply the proposal/transition-kernel to the current state to get the proposed new state
+    proposed.mu<-current.mu+runif(2,-0.2,0.2)
+
+    # calculate hastings ratio
+    # first we need the density of the data under the new and old values for the mean - note that we work with logs!
+    pdf.before<-sum(log(dmvnorm(our.data, mean=current.mu, sigma=variance.matrix)))
+    pdf.after<-sum(log(dmvnorm(our.data, mean=proposed.mu, sigma=variance.matrix)))
+    # our proposal kernel is symmetric, and uses uniform priors, so the Hastings ratio will be as follows:
+    hr<-exp(pdf.after-pdf.before)
+    
+    # do we accept the transition?
+    p<-runif(1)
+    #browser()
+    if (p<hr){
+      # accept
+      current.mu<-proposed.mu
+    }else{
+      #reject - no need to do anything here
+    }
+    
+    # store the current iteration
+    posterior.mu[i,]<-current.mu  
+  }
+  
+  return (posterior.mu)
+  
+}
+
+# Let's run it three times to enable comparison of results
+mh.draws1 <- do.MHMCMC(100000, mu.vector, variance_matrix)
+mh.draws2 <- do.MHMCMC(100000, mu.vector, variance_matrix)
+mh.draws3 <- do.MHMCMC(100000, mu.vector, variance_matrix)
+
+corr_MH <- cor(mh.draws1[,1], mh.draws2[,2])
+
+# Turn it into an mcmc object so that we can use the coda package
+mh.draws1 <- mcmc(mh.draws1) # turn into an MCMC object
+print(summary(mh.draws1))
+autocorr.plot(mh.draws1,lag=100,main="Autocorrelation for mh.draws1")
+
+# compare multiple chains
+mh.draws2 <- mcmc(mh.draws2) # turn into an MCMC object
+mh.draws3 <- mcmc(mh.draws3) # turn into an MCMC object
+# combine them into what is known as an mcmc.list (a collection of mcmc outputs)
+mh.list <- mcmc.list(list(mh.draws1, mh.draws2, mh.draws3))
+
+# run the gelman test
+cat("\nGelman test results follow...")
+print(gelman.diag(mh.list))
+gelman.plot(mh.list,main="Gelman plots")
+# look at the output
+plot(mh.draws1,main="Results for mh.draws1")
+plot(mh.draws2,main="Result for mh.draws2")
+acf(mh.draws2,main="Autocorrelation for mh.draws2")
+```
+
+## Adaptive MCMC
+
+```{r}
+adapt.log <- function(mu){
+  return(sum(log(dmvnorm(our.data, mean = mu, sigma = variance_matrix))))
+}
+
+adapt_1 <- MCMC(adapt.log, 100000, init = mu.vector, scale = c(0.2, 0.2), adapt = T, acc.rate = 0.25)
+
+adapt_2 <- MCMC(adapt.log, 100000, init = mu.vector, scale = c(0.2, 0.2), adapt = T, acc.rate = 0.25)
+
+adapt_3 <- MCMC(adapt.log, 100000, init = mu.vector, scale = c(0.2, 0.2), adapt = T, acc.rate = 0.25)
+
+corr_adapt <- cor(adapt_1$samples[,1], adapt_1$samples[,2])
+
+adapt_1_sample <- adapt_1$samples
+
+adapt_2_sample <- adapt_2$samples
+
+adapt_3_sample <- adapt_3$samples
+
+adapt_1_sample <- mcmc(adapt_1_sample)
+adapt_2_sample <- mcmc(adapt_2_sample)
+adapt_3_sample <- mcmc(adapt_3_sample)
+
+print(summary(adapt_1_sample))
+autocorr.plot(adapt_1_sample,lag = 100, main = "Autocorrelation for adapt_1")
+
+adapt_sample <- mcmc.list(list(adapt_1_sample, adapt_2_sample, adapt_3_sample))
+
+cat("\nGelman test results follow...")
+print(gelman.diag(adapt_sample))
+gelman.plot(adapt_sample, main = "Gelman plots")
+
+plot(adapt_1_sample, main = "Results for adapt_1")
+
+plot(adapt_2_sample, main = "Results for adapt_2")
+
+acf(adapt_2_sample)
+```
